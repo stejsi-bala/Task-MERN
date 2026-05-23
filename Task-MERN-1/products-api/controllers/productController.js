@@ -1,63 +1,95 @@
-const products = []
+// taskController.js
 
-const getProducts = (req, res) => {
-    res.status(200).json(products)
-}
+const asyncHandler = require('express-async-handler');
 
-const getProduct = (req, res) => {
-    res.status(200).json({
-        message: `Produkti ${req.params.id}`
-    })
-}
+const Task = require('../models/taskModel');
+const User = require('../models/userModel');
 
-const createProduct = (req, res) => {
+const getTasks = asyncHandler(async (req, res) => {
 
-    if (!req.body.name) {
-        res.status(400)
-        throw new Error('Ju lutem shkruani emrin')
+    const tasks = await Task.find({ user: req.user.id });
+
+    res.status(200).json(tasks);
+
+});
+
+const setTask = asyncHandler(async (req, res) => {
+
+    if (!req.body || !req.body.text) {
+        res.status(400);
+        throw new Error('Please enter a task');
     }
 
-    if (req.body.price <= 0) {
-        res.status(400)
-        throw new Error('Price duhet me i madh se 0')
+    const task = await Task.create({
+        text: req.body.text,
+        user: req.user.id,
+    });
+
+    res.status(200).json(task);
+
+});
+
+const updateTask = asyncHandler(async (req, res) => {
+
+    const task = await Task.findById(req.params.id);
+
+    if (!task) {
+        res.status(400);
+        throw new Error('Task not found');
     }
 
-    if (req.body.stock < 0) {
-        res.status(400)
-        throw new Error('Stock nuk mund te jete negativ')
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        res.status(401);
+        throw new Error('No such user found');
     }
 
-    products.push(req.body)
+    if (task.user.toString() !== user.id) {
+        res.status(401);
+        throw new Error('User is not authorized to update');
+    }
 
-    res.status(201).json({
-        message: 'Produkti i krijuar',
-        data: req.body
-    })
-}
+    const updatedTask = await Task.findByIdAndUpdate(
+        req.params.id,
+        req.body,
+        { new: true }
+    );
 
-const updateProduct = (req, res) => {
-    res.status(200).json({
-        message: `Produkti ${req.params.id} u perditesua`
-    })
-}
+    res.status(200).json(updatedTask);
 
-const deleteProduct = (req, res) => {
-    res.status(200).json({
-        message: `Produkti ${req.params.id} u fshi`
-    })
-}
+});
 
-const searchProducts = (req, res) => {
-    res.status(200).json({
-        message: `Kerkim per ${req.query.q}`
-    })
-}
+const deleteTask = asyncHandler(async (req, res) => {
+
+    const task = await Task.findById(req.params.id);
+
+    if (!task) {
+        res.status(400);
+        throw new Error('Task not found');
+    }
+
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+        res.status(401);
+        throw new Error('No such user found');
+    }
+
+    if (task.user.toString() !== user.id) {
+        res.status(401);
+        throw new Error('User is not authorized to delete');
+    }
+
+    await Task.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({ id: req.params.id });
+
+});
 
 module.exports = {
-    getProducts,
-    getProduct,
-    createProduct,
-    updateProduct,
-    deleteProduct,
-    searchProducts
-}
+    getTasks,
+    setTask,
+    updateTask,
+    deleteTask,
+};
